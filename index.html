@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ToDo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <h1>ToDo</h1>
+
+    <form id="new-form" class="new-form" autocomplete="off">
+      <input id="new-title" type="text" placeholder="やることを入力して Enter" aria-label="新しいタスク" maxlength="200" autofocus>
+      <input id="new-due" type="date" class="due-input" aria-label="期限（任意）" title="期限（任意）">
+      <button type="submit" class="primary">追加</button>
+    </form>
+
+    <section id="main" class="main" hidden>
+      <div class="toolbar">
+        <label class="toggle-all">
+          <input id="toggle-all" type="checkbox" class="toggle">
+          すべて完了
+        </label>
+        <label class="sort">
+          並び順
+          <select id="sort">
+            <option value="manual">手動</option>
+            <option value="due">期限順</option>
+          </select>
+        </label>
+        <nav class="filters" aria-label="表示の絞り込み">
+          <a href="#/" data-filter="all">すべて</a>
+          <a href="#/active" data-filter="active">未完了</a>
+          <a href="#/completed" data-filter="completed">完了</a>
+        </nav>
+      </div>
+
+      <ul id="list" class="list"></ul>
+
+      <footer class="footer">
+        <span id="count"></span>
+        <button id="clear-completed" type="button" class="link">完了済みを削除</button>
+      </footer>
+      <p id="hint" class="hint"></p>
+    </section>
+
+    <p id="empty" class="empty">タスクはまだありません。</p>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

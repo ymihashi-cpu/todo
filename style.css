@@ -1,0 +1,430 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --text: #1f2328;
+  --muted: #6b7280;
+  --border: #e3e5e8;
+  --accent: #2563eb;
+  --accent-text: #ffffff;
+  --danger: #dc2626;
+  --done: #9ca3af;
+  --toast-bg: #1f2328;
+  --toast-text: #f4f5f7;
+  --toast-action: #8ab4ff;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111418;
+    --surface: #1b1f24;
+    --text: #e6e8eb;
+    --muted: #9aa3ad;
+    --border: #2d333b;
+    --accent: #4f8cff;
+    --accent-text: #0b1220;
+    --danger: #f87171;
+    --done: #6b7280;
+    --toast-bg: #e6e8eb;
+    --toast-text: #111418;
+    --toast-action: #1d4ed8;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.app {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 40px 16px 64px;
+}
+
+h1 {
+  margin: 0 0 20px;
+  font-size: 1.75rem;
+  letter-spacing: 0.02em;
+}
+
+/* ---- 入力フォーム ---- */
+
+.new-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.new-form #new-title {
+  flex-basis: 200px;
+}
+
+.new-form input,
+.edit,
+.due-input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.new-form .due-input,
+.due-input {
+  flex: none;
+  color: var(--muted);
+}
+
+.edit-due {
+  padding: 8px 10px;
+}
+
+.primary {
+  padding: 10px 18px;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius);
+}
+
+.primary:hover {
+  filter: brightness(1.08);
+}
+
+/* ---- リスト ---- */
+
+.main {
+  margin-top: 20px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.toggle-all {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.sort {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--muted);
+}
+
+.sort select {
+  padding: 3px 6px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.filters {
+  display: flex;
+  gap: 4px;
+}
+
+.filters a {
+  padding: 4px 10px;
+  color: var(--muted);
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+.filters a:hover {
+  color: var(--text);
+}
+
+.filters a[aria-current="page"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 52px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.item .title {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.item.completed .title {
+  color: var(--done);
+  text-decoration: line-through;
+}
+
+.item.sortable {
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ドラッグでつかんでいる行。ポインターに付いて動く */
+.item.lifted {
+  position: relative;
+  z-index: 1;
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.18);
+  opacity: 0.95;
+  pointer-events: none;
+}
+
+.is-dragging,
+.is-dragging * {
+  cursor: grabbing !important;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* つまみ。タッチではここをつかんだときだけ並び替える（行の他の場所はスクロール用） */
+.handle {
+  display: grid;
+  flex: none;
+  place-items: center;
+  align-self: stretch;
+  width: 28px;
+  margin: -8px -4px -8px -10px;
+  color: var(--muted);
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+
+.handle::before {
+  width: 9px;
+  height: 15px;
+  content: "";
+  background: radial-gradient(circle, currentColor 1.4px, transparent 1.8px) 0 0 / 4.5px 5px;
+  opacity: 0.7;
+}
+
+.item.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.item.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.due {
+  flex: none;
+  padding: 1px 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.due.today {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.due.overdue {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.item.completed .due {
+  color: var(--done);
+}
+
+.toggle {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.icon-btn {
+  flex: none;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+}
+
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--bg);
+}
+
+.delete-btn:hover {
+  color: var(--danger);
+}
+
+.filter-empty {
+  padding: 20px 14px;
+  color: var(--muted);
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---- フッター ---- */
+
+.footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.link {
+  padding: 0;
+  color: var(--muted);
+  background: none;
+  border: 0;
+}
+
+.link:hover {
+  color: var(--danger);
+  text-decoration: underline;
+}
+
+.hint {
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+
+.empty {
+  margin-top: 32px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ---- 元に戻す ---- */
+
+/* 読み上げ領域として常に置いておき、中身があるときだけカードが見える */
+.toast {
+  position: fixed;
+  right: 0;
+  bottom: 16px;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+.toast-card {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  max-width: 100%;
+  padding: 8px 8px 8px 16px;
+  color: var(--toast-text);
+  background: var(--toast-bg);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+  pointer-events: auto;
+  animation: toast-in 0.2s ease-out;
+}
+
+.toast-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.undo-btn {
+  flex: none;
+  padding: 6px 10px;
+  font-weight: 600;
+  color: var(--toast-action);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+}
+
+.undo-btn:hover {
+  background: color-mix(in srgb, var(--toast-action) 15%, transparent);
+}
+
+.undo-btn:focus-visible {
+  outline-color: var(--toast-action);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-card {
+    animation: none;
+  }
+}
