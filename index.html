@@ -12,11 +12,25 @@
 
     <form id="new-form" class="new-form" autocomplete="off">
       <input id="new-title" type="text" placeholder="やることを入力して Enter" aria-label="新しいタスク" maxlength="200" autofocus>
+      <input id="new-tags" type="text" class="tags-input" placeholder="タグ（スペース区切り）" aria-label="タグ（任意。スペースかカンマで区切る）" maxlength="200">
+      <select id="new-priority" class="priority-select" aria-label="優先度">
+        <option value="high">優先度 高</option>
+        <option value="medium" selected>優先度 中</option>
+        <option value="low">優先度 低</option>
+      </select>
       <input id="new-due" type="date" class="due-input" aria-label="期限（任意）" title="期限（任意）">
       <button type="submit" class="primary">追加</button>
     </form>
 
     <section id="main" class="main" hidden>
+      <div class="search-bar">
+        <input id="search" type="search" class="search-input" placeholder="タイトルやタグで検索" aria-label="タスクを検索">
+        <p id="tag-filter" class="tag-filter" hidden>
+          <span id="tag-filter-name"></span>
+          <button id="clear-tag" type="button" class="link">解除</button>
+        </p>
+      </div>
+
       <div class="toolbar">
         <label class="toggle-all">
           <input id="toggle-all" type="checkbox" class="toggle">
@@ -27,6 +41,7 @@
           <select id="sort">
             <option value="manual">手動</option>
             <option value="due">期限順</option>
+            <option value="priority">優先度順</option>
           </select>
         </label>
         <nav class="filters" aria-label="表示の絞り込み">

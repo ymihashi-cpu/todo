@@ -12,6 +12,9 @@
   --toast-bg: #1f2328;
   --toast-text: #f4f5f7;
   --toast-action: #8ab4ff;
+  --priority-high: #dc2626;
+  --priority-medium: #b45309;
+  --priority-low: #0f766e;
   --radius: 10px;
 }
 
@@ -29,6 +32,9 @@
     --toast-bg: #e6e8eb;
     --toast-text: #111418;
     --toast-action: #1d4ed8;
+    --priority-high: #f87171;
+    --priority-medium: #fbbf24;
+    --priority-low: #2dd4bf;
   }
 }
 
@@ -40,6 +46,15 @@
 
 [hidden] {
   display: none !important;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 body {
@@ -84,11 +99,18 @@ h1 {
 }
 
 .new-form #new-title {
-  flex-basis: 200px;
+  flex-basis: 100%;
+}
+
+.new-form .tags-input {
+  flex-basis: 140px;
 }
 
 .new-form input,
 .edit,
+.tags-input,
+.search-input,
+.priority-select,
 .due-input {
   flex: 1;
   min-width: 0;
@@ -101,11 +123,19 @@ h1 {
 }
 
 .new-form .due-input,
-.due-input {
+.due-input,
+.priority-select {
   flex: none;
   color: var(--muted);
 }
 
+.priority-select {
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
+.edit-tags,
+.edit-priority,
 .edit-due {
   padding: 8px 10px;
 }
@@ -131,6 +161,35 @@ h1 {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+}
+
+/* ---- 検索・タグの絞り込み ---- */
+
+.search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-input {
+  flex: 1 1 100%;
+  padding: 7px 12px;
+}
+
+.tag-filter {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+
+.tag-filter .link:hover {
+  color: var(--text);
 }
 
 .toolbar {
@@ -197,17 +256,90 @@ h1 {
 }
 
 .item {
+  --priority: var(--priority-medium);
   display: flex;
   gap: 10px;
   align-items: center;
   min-height: 52px;
-  padding: 8px 14px;
+  padding: 8px 14px 8px 11px;
   border-bottom: 1px solid var(--border);
+  /* 左端の線で優先度を示す */
+  border-left: 3px solid var(--priority);
+}
+
+.item.priority-high {
+  --priority: var(--priority-high);
+}
+
+.item.priority-low {
+  --priority: var(--priority-low);
+}
+
+.item.completed {
+  --priority: var(--done);
+}
+
+.item.editing {
+  flex-wrap: wrap;
+}
+
+.item.editing .edit {
+  flex-basis: 100%;
+}
+
+.item.editing .edit-tags {
+  flex-basis: 140px;
+}
+
+.item .content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .item .title {
-  flex: 1;
   overflow-wrap: anywhere;
+}
+
+.priority {
+  flex: none;
+  padding: 0 7px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--priority);
+  border: 1px solid var(--priority);
+  border-radius: 999px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag-btn {
+  padding: 0 8px;
+  font-size: 0.78rem;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 0;
+  border-radius: 999px;
+}
+
+.tag-btn:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.tag-btn[aria-pressed="true"] {
+  color: var(--accent-text);
+  background: var(--accent);
+}
+
+.item.completed .tag-btn:not([aria-pressed="true"]) {
+  color: var(--done);
 }
 
 .item.completed .title {
