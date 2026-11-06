@@ -14,19 +14,37 @@ const FILTER_EMPTY_MESSAGES = {
   completed: '完了したタスクはありません。',
 };
 
+const SEARCH_EMPTY_MESSAGE = '条件に合うタスクはありません。';
+
+// rank が小さいほど優先度が高い
+const PRIORITIES = {
+  high: { label: '高', rank: 0 },
+  medium: { label: '中', rank: 1 },
+  low: { label: '低', rank: 2 },
+};
+const DEFAULT_PRIORITY = 'medium';
+
+const TAG_MAX_LENGTH = 30;
+const TAG_SEPARATOR_RE = /[\s,、，]+/;
+
 // manual は保存されている順（ドラッグなどで並べた順）のまま表示する
 const SORTS = {
   manual: null,
   due: compareDue,
+  priority: comparePriority,
 };
 
 const HINTS = {
   manual: 'ドラッグ（スマホでは左端のつまみ）、または Alt + ↑↓ キーで並び替えできます。',
   due: '期限が近い順に表示しています（期限なしは最後）。並び替えるには並び順を「手動」にしてください。',
+  priority: '優先度の高い順に表示しています（同じ優先度は期限が近い順）。並び替えるには並び順を「手動」にしてください。',
 };
 
 // 項目の中でフォーカスを受け取る部品
 const ITEM_CONTROLS = ['.toggle', '.edit-btn', '.delete-btn'];
+
+// 編集中の項目の入力欄
+const EDIT_FIELDS = '.edit, .edit-tags, .edit-priority, .edit-due';
 
 const UNDO_TIMEOUT = 8000; // 「元に戻す」を表示しておく時間 (ms)
 const DRAG_THRESHOLD = 5; // マウスをこれ以上動かしたらドラッグ開始（クリックと区別する）
@@ -38,8 +56,14 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const els = {
   form: document.getElementById('new-form'),
   input: document.getElementById('new-title'),
+  tags: document.getElementById('new-tags'),
+  priority: document.getElementById('new-priority'),
   due: document.getElementById('new-due'),
   main: document.getElementById('main'),
+  search: document.getElementById('search'),
+  tagFilter: document.getElementById('tag-filter'),
+  tagFilterName: document.getElementById('tag-filter-name'),
+  clearTag: document.getElementById('clear-tag'),
   toggleAll: document.getElementById('toggle-all'),
   sort: document.getElementById('sort'),
   filterLinks: document.querySelectorAll('.filters a'),
@@ -55,6 +79,8 @@ const state = {
   todos: load(),
   filter: filterFromHash(),
   sort: loadSort(),
+  query: '',
+  tag: null, // このタグの付いたタスクだけ表示する（null なら絞り込まない）
   editingId: null,
   drag: null,
   // 「元に戻す」で戻せる削除。{ entries: [{ todo, index }], timer }
@@ -67,8 +93,13 @@ function load() {
   try {
     const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     if (!Array.isArray(data)) return [];
-    // 期限 (due) 追加前に保存されたデータも読めるようにする
-    return data.filter(isValidTodo).map((todo) => ({ ...todo, due: todo.due ?? null }));
+    // 期限・優先度・タグの追加前に保存されたデータも読めるようにする
+    return data.filter(isValidTodo).map((todo) => ({
+      ...todo,
+      due: todo.due ?? null,
+      priority: Object.hasOwn(PRIORITIES, todo.priority) ? todo.priority : DEFAULT_PRIORITY,
+      tags: Array.isArray(todo.tags) ? normalizeTags(todo.tags) : [],
+    }));
   } catch {
     return [];
   }
@@ -126,6 +157,38 @@ function compareDue(a, b) {
   return a.due < b.due ? -1 : 1;
 }
 
+function comparePriority(a, b) {
+  return PRIORITIES[a.priority].rank - PRIORITIES[b.priority].rank || compareDue(a, b);
+}
+
+// 「仕事 #買い物, 家」のような入力をタグの配列にする（先頭の # は省く、重複は除く）
+function parseTags(text) {
+  return normalizeTags(text.split(TAG_SEPARATOR_RE));
+}
+
+function normalizeTags(values) {
+  const tags = values
+    .filter((value) => typeof value === 'string')
+    .map((value) => value.trim().replace(/^#+/, '').slice(0, TAG_MAX_LENGTH))
+    .filter(Boolean);
+  return [...new Set(tags)];
+}
+
+// 検索語をスペースで区切り、すべての語がタイトルかタグのどれかに含まれれば一致とする
+function matchesQuery(todo, query) {
+  const words = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const texts = [todo.title, ...todo.tags].map((text) => text.toLocaleLowerCase());
+  return words.every((word) => texts.some((text) => text.includes(word)));
+}
+
+function isVisible(todo) {
+  return (
+    FILTERS[state.filter](todo) &&
+    (state.tag === null || todo.tags.includes(state.tag)) &&
+    matchesQuery(todo, state.query)
+  );
+}
+
 function newId() {
   if (window.crypto && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -149,9 +212,15 @@ function findTodo(id) {
   return state.todos.find((todo) => todo.id === id);
 }
 
-function addTodo(title, due) {
-  state.todos.push({ id: newId(), title, completed: false, due: due || null });
+function addTodo(title, { due, priority, tags }) {
+  state.todos.push({ id: newId(), title, completed: false, due: due || null, priority, tags });
   commit();
+}
+
+// 同じタグをもう一度選んだら絞り込みを解除する
+function toggleTagFilter(tag) {
+  state.tag = state.tag === tag ? null : tag;
+  render();
 }
 
 // id のタスクを targetId のタスクの前 (before) または後 (after) に移動する
@@ -232,7 +301,7 @@ function startEdit(id) {
 }
 
 // 空文字で確定した場合はタスクを削除する
-function finishEdit(id, { title, due }, { refocus = false } = {}) {
+function finishEdit(id, { title, due, priority, tags }, { refocus = false } = {}) {
   // Enter で確定した直後の blur による二重確定を防ぐ
   if (state.editingId !== id) return;
   state.editingId = null;
@@ -242,6 +311,8 @@ function finishEdit(id, { title, due }, { refocus = false } = {}) {
   if (todo && trimmed) {
     todo.title = trimmed;
     todo.due = due || null;
+    todo.priority = priority;
+    todo.tags = tags;
     commit();
   } else {
     removeTodo(id);
@@ -268,8 +339,8 @@ function focusItem(id, selector = '.edit-btn') {
 // ---- 描画 ----
 
 function render() {
-  const { todos, filter, sort } = state;
-  const visible = todos.filter(FILTERS[filter]);
+  const { todos, filter, sort, query, tag } = state;
+  const visible = todos.filter(isVisible);
   if (SORTS[sort]) visible.sort(SORTS[sort]);
   const remaining = todos.filter(FILTERS.active).length;
   const focus = captureFocus();
@@ -280,11 +351,14 @@ function render() {
   if (visible.length === 0 && todos.length !== 0) {
     const li = document.createElement('li');
     li.className = 'filter-empty';
-    li.textContent = FILTER_EMPTY_MESSAGES[filter];
+    li.textContent = query.trim() || tag !== null ? SEARCH_EMPTY_MESSAGE : FILTER_EMPTY_MESSAGES[filter];
     els.list.replaceChildren(li);
   } else {
     els.list.replaceChildren(...visible.map(renderItem));
   }
+
+  els.tagFilter.hidden = tag === null;
+  els.tagFilterName.textContent = tag === null ? '' : `タグ「#${tag}」で絞り込み中`;
 
   els.count.textContent = `残り ${remaining} 件 / 全 ${todos.length} 件`;
   els.toggleAll.checked = todos.length !== 0 && remaining === 0;
@@ -333,9 +407,11 @@ function restoreFocus(saved) {
 function renderItem(todo) {
   const li = document.createElement('li');
   li.className = todo.completed ? 'item completed' : 'item';
+  li.classList.add(`priority-${todo.priority}`);
   li.dataset.id = todo.id;
 
   if (state.editingId === todo.id) {
+    li.classList.add('editing');
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'edit';
@@ -343,13 +419,24 @@ function renderItem(todo) {
     input.maxLength = 200;
     input.setAttribute('aria-label', 'タスクを編集（Enter で確定、Esc で取り消し）');
 
+    const tags = document.createElement('input');
+    tags.type = 'text';
+    tags.className = 'tags-input edit-tags';
+    tags.value = todo.tags.join(' ');
+    tags.maxLength = 200;
+    tags.placeholder = 'タグ（スペース区切り）';
+    tags.setAttribute('aria-label', 'タグを編集（スペースかカンマで区切る）');
+
+    const priority = prioritySelect(todo.priority);
+    priority.classList.add('edit-priority');
+
     const due = document.createElement('input');
     due.type = 'date';
     due.className = 'due-input edit-due';
     due.value = todo.due || '';
     due.setAttribute('aria-label', '期限を編集（空欄で期限なし）');
 
-    li.append(input, due);
+    li.append(input, tags, priority, due);
     return li;
   }
 
@@ -374,13 +461,56 @@ function renderItem(todo) {
   title.textContent = todo.title;
   title.title = 'ダブルクリックで編集';
 
-  li.append(checkbox, title);
+  const content = document.createElement('div');
+  content.className = 'content';
+  content.append(title);
+  if (todo.tags.length) content.append(tagList(todo.tags));
+
+  li.append(checkbox, priorityBadge(todo.priority), content);
   if (todo.due) li.append(dueBadge(todo));
   li.append(
     iconButton('編集', 'edit-btn', `「${todo.title}」を編集`),
     iconButton('削除', 'delete-btn', `「${todo.title}」を削除`),
   );
   return li;
+}
+
+function prioritySelect(value) {
+  const select = document.createElement('select');
+  select.className = 'priority-select';
+  select.setAttribute('aria-label', '優先度');
+  for (const [key, { label }] of Object.entries(PRIORITIES)) {
+    select.add(new Option(`優先度 ${label}`, key, false, key === value));
+  }
+  return select;
+}
+
+function priorityBadge(priority) {
+  const span = document.createElement('span');
+  span.className = 'priority';
+  span.title = `優先度 ${PRIORITIES[priority].label}`;
+  // 色だけに頼らず、読み上げでも優先度がわかるようにする
+  const hidden = document.createElement('span');
+  hidden.className = 'visually-hidden';
+  hidden.textContent = '優先度 ';
+  span.append(hidden, PRIORITIES[priority].label);
+  return span;
+}
+
+function tagList(tags) {
+  const div = document.createElement('div');
+  div.className = 'tags';
+  for (const tag of tags) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tag-btn';
+    button.dataset.tag = tag;
+    button.textContent = `#${tag}`;
+    button.setAttribute('aria-pressed', String(state.tag === tag));
+    button.setAttribute('aria-label', `タグ「${tag}」で絞り込む`);
+    div.append(button);
+  }
+  return div;
 }
 
 function dueBadge(todo) {
@@ -469,6 +599,8 @@ function editValues(li) {
   return {
     title: li.querySelector('.edit').value,
     due: li.querySelector('.edit-due').value,
+    priority: li.querySelector('.edit-priority').value,
+    tags: parseTags(li.querySelector('.edit-tags').value),
   };
 }
 
@@ -476,10 +608,28 @@ els.form.addEventListener('submit', (event) => {
   event.preventDefault();
   const title = els.input.value.trim();
   if (!title) return;
-  addTodo(title, els.due.value);
+  addTodo(title, {
+    due: els.due.value,
+    priority: els.priority.value,
+    tags: parseTags(els.tags.value),
+  });
   els.input.value = '';
+  els.tags.value = '';
+  els.priority.value = DEFAULT_PRIORITY;
   els.due.value = '';
   els.input.focus();
+});
+
+els.search.addEventListener('input', () => {
+  state.query = els.search.value;
+  render();
+});
+
+els.clearTag.addEventListener('click', () => {
+  state.tag = null;
+  render();
+  // 解除ボタンは消えるので、フォーカスを検索欄へ移す
+  els.search.focus();
 });
 
 els.list.addEventListener('change', (event) => {
@@ -493,6 +643,13 @@ els.list.addEventListener('click', (event) => {
   if (!button) return;
   if (button.matches('.delete-btn')) removeTodo(itemId(button));
   else if (button.matches('.edit-btn')) startEdit(itemId(button));
+  else if (button.matches('.tag-btn')) {
+    const id = itemId(button);
+    const { tag } = button.dataset;
+    toggleTagFilter(tag);
+    // 押したタグのボタンにフォーカスを戻す（項目は描き直されている）
+    itemElement(id)?.querySelector(`.tag-btn[data-tag="${CSS.escape(tag)}"]`)?.focus();
+  }
 });
 
 els.list.addEventListener('dblclick', (event) => {
@@ -500,7 +657,7 @@ els.list.addEventListener('dblclick', (event) => {
 });
 
 els.list.addEventListener('keydown', (event) => {
-  if (!event.target.matches('.edit, .edit-due')) return;
+  if (!event.target.matches(EDIT_FIELDS)) return;
   // IME の変換確定で押された Enter は無視する
   if (event.isComposing || event.keyCode === 229) return;
   const li = event.target.closest('li');
@@ -513,9 +670,9 @@ els.list.addEventListener('keydown', (event) => {
 });
 
 els.list.addEventListener('focusout', (event) => {
-  if (!event.target.matches('.edit, .edit-due')) return;
+  if (!event.target.matches(EDIT_FIELDS)) return;
   const li = event.target.closest('li');
-  // タイトル欄と期限欄の間でフォーカスが移るだけなら確定しない
+  // 編集中の項目の入力欄どうしでフォーカスが移るだけなら確定しない
   if (li.contains(event.relatedTarget)) return;
   finishEdit(li.dataset.id, editValues(li));
 });
